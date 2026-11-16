@@ -2,12 +2,26 @@ import { debounce } from './debounce.js';
 import { searchCountries } from './searchCountries.js';
 import type { MappedCountry } from './types.js';
 
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name: string }).name === 'AbortError'
+  );
+}
+
 export class SearchController {
   private currentController: AbortController | null = null;
   private debouncedSearch: (query: string) => void;
 
   constructor(
-    private onResults: (data: MappedCountry[]) => void,
+    private callbacks: {
+      onResults: (data: MappedCountry[]) => void;
+      onLoading: () => void;
+      onError: (error: unknown) => void;
+      onEmpty: () => void;
+    },
     private debounceDelay: number = 300,
   ) {
     this.debouncedSearch = debounce((query: string) => {
@@ -18,13 +32,15 @@ export class SearchController {
   public updateQuery(query: string): void {
     if (this.currentController) {
       this.currentController.abort();
+      this.currentController = null;
     }
 
     if (!query.trim()) {
-      this.onResults([]);
+      this.callbacks.onResults([]);
       return;
     }
 
+    this.callbacks.onLoading();
     this.debouncedSearch(query);
   }
 
@@ -33,12 +49,16 @@ export class SearchController {
 
     try {
       const results = await searchCountries(query, this.currentController.signal);
-      this.onResults(results);
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
+
+      if (results.length === 0) {
+        this.callbacks.onEmpty();
+      } else {
+        this.callbacks.onResults(results);
       }
-      console.error('Search error:', error);
+    } catch (error: unknown) {
+      if (isAbortError(error)) return;
+
+      this.callbacks.onError(error);
     }
   }
 }
