@@ -9,7 +9,7 @@
     "format": "prettier --write .",
     "test": "vitest",
     "test:run": "vitest run",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "prepare": "husky"
   },
   "lint-staged": {
