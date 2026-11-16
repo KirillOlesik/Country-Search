@@ -15,10 +15,9 @@ describe('SearchController — Race Condition', () => {
   it('не перезаписывает свежий результат устаревшим ответом', async () => {
     vi.mocked(fetch).mockImplementation((url, init) => {
       const query = (url as string).split('/').pop();
+      const delay = query === 'spain' ? 100 : 500;
 
       return new Promise((resolve, reject) => {
-        const delay = query === 'spain' ? 100 : 500;
-
         const timer = setTimeout(() => {
           resolve({
             ok: true,
@@ -37,16 +36,19 @@ describe('SearchController — Race Condition', () => {
     const engine = new SearchController(onResultsMock, 300);
 
     engine.updateQuery('sp');
-    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(300);
+
     engine.updateQuery('spain');
-    vi.advanceTimersByTime(300);
-    vi.advanceTimersByTime(100);
 
-    expect(onResultsMock).toHaveBeenLastCalledWith([{ name: 'spain' }]);
-    expect(onResultsMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(300);
 
-    vi.advanceTimersByTime(400);
+    await vi.advanceTimersByTimeAsync(100);
+
     expect(onResultsMock).toHaveBeenCalledTimes(1);
-    expect(onResultsMock).not.toHaveBeenCalledWith([{ name: 'sp' }]);
+    expect(onResultsMock).toHaveBeenLastCalledWith([expect.objectContaining({ name: 'spain' })]);
+
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(onResultsMock).toHaveBeenCalledTimes(1);
   });
 });
