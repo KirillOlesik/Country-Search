@@ -13,98 +13,127 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 const app = el('div', 'app');
-const title = el('h1', 'title', 'Поиск стран');
+const header = el('header', 'header');
+header.append(
+  el('h1', 'title', 'Поиск стран'),
+  el('p', 'subtitle', 'Введите название на английском, например: France, Japan, Brazil'),
+);
 
+const searchWrapper = el('div', 'search-wrapper');
 const input = el('input', 'search-input');
 input.type = 'text';
-input.placeholder = 'Введите название страны (например, Spain)...';
+input.placeholder = 'Начните печатать...';
+input.autocomplete = 'off';
+searchWrapper.appendChild(input);
 
 const statusContainer = el('div', 'status-container');
 const resultsContainer = el('div', 'results-grid');
-const detailsContainer = el('div', 'details-container');
-detailsContainer.style.display = 'none';
 
-app.append(title, input, statusContainer, resultsContainer, detailsContainer);
+const modalOverlay = el('div', 'modal-overlay');
+const modalContent = el('div', 'modal-content');
+modalOverlay.addEventListener('click', (e: MouseEvent) => {
+  if (e.target === modalOverlay) {
+    modalOverlay.style.display = 'none';
+  }
+});
+modalOverlay.appendChild(modalContent);
+modalOverlay.style.display = 'none';
+
+app.append(header, searchWrapper, statusContainer, resultsContainer, modalOverlay);
 document.body.appendChild(app);
 
-// 2. Функции отрисовки
 function showLoading() {
-  statusContainer.textContent = 'Загрузка...';
-  statusContainer.className = 'status loading';
-  resultsContainer.replaceChildren(); // Безопасная очистка вместо innerHTML
-  detailsContainer.style.display = 'none';
+  statusContainer.textContent = '';
+  resultsContainer.replaceChildren();
+  modalOverlay.style.display = 'none';
+
+  for (let i = 0; i < 8; i++) {
+    const skeleton = el('div', 'card skeleton');
+    skeleton.append(
+      el('div', 'skeleton-img'),
+      el('div', 'skeleton-text title'),
+      el('div', 'skeleton-text line'),
+    );
+    resultsContainer.appendChild(skeleton);
+  }
 }
 
 function showEmpty() {
-  statusContainer.textContent = 'Ничего не найдено. Попробуйте другое название.';
-  statusContainer.className = 'status empty';
+  statusContainer.textContent = 'По вашему запросу ничего не найдено';
+  statusContainer.className = 'status-container empty';
   resultsContainer.replaceChildren();
-  detailsContainer.style.display = 'none';
+  modalOverlay.style.display = 'none';
 }
 
 function showError(error: unknown) {
-  // Тут мы можем проверить error, если это HttpError, и показать статус
-  console.error('Error details:', error);
-
-  statusContainer.textContent = 'Произошла ошибка при загрузке данных.';
-  statusContainer.className = 'status error';
+  console.error(error);
+  statusContainer.textContent = 'Ошибка загрузки данных. Проверьте интернет.';
+  statusContainer.className = 'status-container error';
   resultsContainer.replaceChildren();
+  modalOverlay.style.display = 'none';
 
-  const retryBtn = el('button', 'retry-btn', 'Повторить');
-  retryBtn.onclick = () => {
-    controller.updateQuery(input.value);
-  };
+  const retryBtn = el('button', 'retry-btn', 'Попробовать снова');
+  retryBtn.onclick = () => controller.updateQuery(input.value);
   statusContainer.appendChild(retryBtn);
-  detailsContainer.style.display = 'none';
 }
 
 function showResults(countries: MappedCountry[]) {
   statusContainer.textContent = '';
-  statusContainer.className = 'status';
+  statusContainer.className = 'status-container';
   resultsContainer.replaceChildren();
-  detailsContainer.style.display = 'none';
+  modalOverlay.style.display = 'none';
 
   countries.forEach((country) => {
     const card = el('div', 'card');
-    const flag = el('div', 'card-flag', country.flag || '🏳️');
-    const name = el('h2', 'card-name', country.name);
-    const capital = el('p', 'card-capital', `Столица: ${country.capital || 'Нет данных'}`);
-    const region = el('p', 'card-region', `Регион: ${country.region}`);
 
-    card.append(flag, name, capital, region);
+    const flagImg = el('img', 'card-flag');
+    flagImg.src = country.flagUrl || 'https://flagcdn.com/w320/un.png';
+    flagImg.alt = country.name;
+    flagImg.loading = 'lazy';
+
+    const name = el('h2', 'card-name', country.name);
+    const capital = el('p', 'card-info', `Столица: ${country.capital || '—'}`);
+    const region = el('p', 'card-info', `Регион: ${country.region}`);
+
+    card.append(flagImg, name, capital, region);
     card.onclick = () => showDetails(country);
     resultsContainer.appendChild(card);
   });
 }
 
 function showDetails(country: MappedCountry) {
-  detailsContainer.style.display = 'block';
-  detailsContainer.replaceChildren();
+  modalOverlay.style.display = 'flex';
+  modalContent.replaceChildren();
 
-  const closeBtn = el('button', 'close-btn', 'Закрыть');
-  closeBtn.onclick = () => {
-    detailsContainer.style.display = 'none';
-  };
+  const closeBtn = el('button', 'close-btn', '✕');
+  closeBtn.onclick = () => (modalOverlay.style.display = 'none');
 
-  const name = el('h2', '', `${country.name} (${country.nativeName})`);
-  const area = el('p', '', `Площадь: ${country.area} км²`);
-  const borders = el(
-    'p',
-    '',
-    `Границы: ${country.borders.length ? country.borders.join(', ') : 'Нет'}`,
-  );
-  const languages = el(
-    'p',
-    '',
-    `Языки: ${country.languages.length ? country.languages.join(', ') : 'Нет данных'}`,
-  );
-  const currencies = el(
-    'p',
-    '',
-    `Валюты: ${country.currencies.length ? country.currencies.join(', ') : 'Нет данных'}`,
+  const headerDiv = el('div', 'modal-header');
+  const flagImg = el('img', 'modal-flag');
+  flagImg.src = country.flagUrl || 'https://flagcdn.com/w320/un.png';
+
+  const titleDiv = el('div');
+  titleDiv.append(el('h2', '', country.name), el('p', 'native-name', country.nativeName));
+  headerDiv.append(flagImg, titleDiv);
+
+  const grid = el('div', 'details-grid');
+  grid.append(
+    el('p', '', ` Население: ${country.population.toLocaleString('ru-RU')}`),
+    el('p', '', ` Площадь: ${country.area.toLocaleString('ru-RU')} км²`),
+    el(
+      'p',
+      '',
+      ` Языки: ${country.languages.length ? country.languages.join(', ') : 'Нет данных'}`,
+    ),
+    el(
+      'p',
+      '',
+      ` Валюты: ${country.currencies.length ? country.currencies.join(', ') : 'Нет данных'}`,
+    ),
+    el('p', '', ` Границы: ${country.borders.length ? country.borders.join(', ') : 'Нет'}`),
   );
 
-  detailsContainer.append(closeBtn, name, area, borders, languages, currencies);
+  modalContent.append(closeBtn, headerDiv, grid);
 }
 
 const controller = new SearchController({
@@ -114,7 +143,6 @@ const controller = new SearchController({
   onEmpty: showEmpty,
 });
 
-// 4. Слушатель. Используем e.target instanceof, чтобы TypeScript сам понял тип
 input.addEventListener('input', (e: Event) => {
   if (e.target instanceof HTMLInputElement) {
     controller.updateQuery(e.target.value);
