@@ -33,15 +33,25 @@ describe('SearchController — Race Condition', () => {
     });
 
     const onResultsMock = vi.fn();
-    const engine = new SearchController(onResultsMock, 300);
+    const onLoadingMock = vi.fn();
+    const onErrorMock = vi.fn();
+    const onEmptyMock = vi.fn();
+
+    const engine = new SearchController(
+      {
+        onResults: onResultsMock,
+        onLoading: onLoadingMock,
+        onError: onErrorMock,
+        onEmpty: onEmptyMock,
+      },
+      300,
+    );
 
     engine.updateQuery('sp');
     await vi.advanceTimersByTimeAsync(300);
 
     engine.updateQuery('spain');
-
     await vi.advanceTimersByTimeAsync(300);
-
     await vi.advanceTimersByTimeAsync(100);
 
     expect(onResultsMock).toHaveBeenCalledTimes(1);
